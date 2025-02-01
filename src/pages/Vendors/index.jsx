@@ -44,7 +44,7 @@ import { isEmpty } from "lodash";
 import { useSelector, useDispatch } from "react-redux";
 import { createSelector } from "reselect";
 import { ToastContainer } from "react-toastify";
-import { getCategories } from "../../api";
+import { createCategory, getCategories } from "../../api";
 
 const Vendors = () => {
   //meta title
@@ -54,7 +54,7 @@ const Vendors = () => {
   const dispatch = useDispatch();
   const [contact, setContact] = useState();
   // validation
-  const validation = useFormik({
+  const categoryValidation = useFormik({
     // enableReinitialize : use this flag when initial values needs to be changed
     enableReinitialize: true,
 
@@ -183,7 +183,7 @@ const Vendors = () => {
 
   const [categories, setCategories] = useState([]);
   const [page, setPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState();
   const [catLevel, setCatLevel] = useState("");
   const [parentCategory, setParentCategory] = useState("");
   const [sort, setSort] = useState("");
@@ -302,6 +302,56 @@ const Vendors = () => {
     []
   );
 
+  // Add these new state variables
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imageUrl, setImageUrl] = useState("");
+
+  // Update validation schema
+  const validation = useFormik({
+    enableReinitialize: true,
+    initialValues: {
+      name: "",
+      description: "",
+      catLevel: "",
+      imageId: "img_67890", // hardcoded for now
+      parentCategory: "", // optional
+      createdBy: "671b0860a814f4e9449ba5a5" // hardcoded for now
+    },
+    validationSchema: Yup.object({
+      name: Yup.string().required("Please Enter Category Name"),
+      description: Yup.string().required("Please Enter Category Description"),
+      catLevel: Yup.number().required("Please Enter Category Level"),
+    }),
+    onSubmit: async (values) => {
+      try {
+        const categoryData = {
+          ...values,
+          imageJson: {
+            url: imageUrl || "https://example.com/image.jpg" // default image if none selected
+          },
+          parentCategory: values.parentCategory || null
+        };
+        
+        await createCategory(
+          categoryData.name,
+          categoryData.description,
+          categoryData.imageId,
+          categoryData.catLevel,
+          categoryData.imageJson,
+          categoryData.parentCategory,
+          categoryData.createdBy
+        );
+
+        fetchCategories(); // Refresh the list
+        toggle(); // Close modal
+        validation.resetForm();
+      } catch (error) {
+        console.error("Error creating category:", error);
+        // Add error handling/notification here
+      }
+    },
+  });
+
   return (
     <React.Fragment>
       <DeleteModal
@@ -344,205 +394,77 @@ const Vendors = () => {
           <Modal isOpen={modal} toggle={toggle}>
             <ModalHeader toggle={toggle} tag="h4">
               {" "}
-              {!!isEdit ? "Edit Vendor" : "Add Vendor"}
+              {!!isEdit ? "Edit Category" : "Add Category"}
             </ModalHeader>
             <ModalBody>
-              <Form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  validation.handleSubmit();
-                  return false;
-                }}
-              >
+              <Form onSubmit={validation.handleSubmit}>
                 <Row>
                   <Col xs={12}>
-                    <Row xs={12}>
-                      <div className="mb-3">
-                        <Label>First Name</Label>
-                        <Input
-                          name="fname"
-                          type="text"
-                          placeholder="Enter First Name"
-                          onChange={validation.handleChange}
-                          onBlur={validation.handleBlur}
-                          value={validation.values.fname || ""}
-                          invalid={
-                            validation.touched.fname && validation.errors.fname
-                              ? true
-                              : false
-                          }
-                        />
-                        {validation.touched.fname && validation.errors.fname ? (
-                          <FormFeedback type="invalid">
-                            {validation.errors.fname}
-                          </FormFeedback>
-                        ) : null}
-                      </div>
-                      <div className="mb-3">
-                        <Label>Last Name</Label>
-                        <Input
-                          name="lname"
-                          type="text"
-                          placeholder="Enter Last Name"
-                          onChange={validation.handleChange}
-                          onBlur={validation.handleBlur}
-                          value={validation.values.lname || ""}
-                          invalid={
-                            validation.touched.lname && validation.errors.lname
-                              ? true
-                              : false
-                          }
-                        />
-                        {validation.touched.lname && validation.errors.lname ? (
-                          <FormFeedback type="invalid">
-                            {validation.errors.lname}
-                          </FormFeedback>
-                        ) : null}
-                      </div>
-                    </Row>
-                    <div className="mb-3">
-                      <Label>Email</Label>
+                    <FormGroup>
+                      <Label>Name</Label>
                       <Input
-                        name="email"
-                        label="Email"
-                        type="email"
-                        placeholder="Enter E-mail"
-                        onChange={validation.handleChange}
-                        onBlur={validation.handleBlur}
-                        value={validation.values.email || ""}
-                        invalid={
-                          validation.touched.email && validation.errors.email
-                            ? true
-                            : false
-                        }
-                      />
-                      {validation.touched.email && validation.errors.email ? (
-                        <FormFeedback type="invalid">
-                          {" "}
-                          {validation.errors.email}{" "}
-                        </FormFeedback>
-                      ) : null}
-                    </div>
-                    {/* <div className="mb-3">
-                      <Label>Option</Label>
-                      <Input
-                        type="select"
-                        name="tags"
-                        className="form-select"
-                        multiple={true}
-                        onChange={validation.handleChange}
-                        onBlur={validation.handleBlur}
-                        value={validation.values.tags || []}
-                        invalid={
-                          validation.touched.tags && validation.errors.tags
-                            ? true
-                            : false
-                        }
-                      >
-                        <option>Photoshop</option>
-                        <option>illustrator</option>
-                        <option>Html</option>
-                        <option>Php</option>
-                        <option>Java</option>
-                        <option>Python</option>
-                        <option>UI/UX Designer</option>
-                        <option>Ruby</option>
-                        <option>Css</option>
-                      </Input>
-                      {validation.touched.tags && validation.errors.tags ? (
-                        <FormFeedback type="invalid">
-                          {" "}
-                          {validation.errors.tags}{" "}
-                        </FormFeedback>
-                      ) : null}
-                    </div> */}
-                    <div className="mb-3">
-                      <Label className="form-label">Password</Label>
-                      <Input
-                        name="password"
-                        type="password"
-                        placeholder="Enter Password"
-                        onChange={validation.handleChange}
-                        onBlur={validation.handleBlur}
-                        value={validation.values.password || ""}
-                        invalid={
-                          validation.touched.password &&
-                            validation.errors.password
-                            ? true
-                            : false
-                        }
-                      />
-                      {validation.touched.password &&
-                        validation.errors.password ? (
-                        <FormFeedback type="invalid">
-                          {validation.errors.password}
-                        </FormFeedback>
-                      ) : null}
-                    </div>
-                    <div className="mb-3">
-                      <Label>Mobile</Label>
-                      <Input
-                        name="mobile"
-                        label="Mobile"
+                        name="name"
                         type="text"
-                        placeholder="Enter Mobile"
+                        placeholder="Enter Category Name"
                         onChange={validation.handleChange}
                         onBlur={validation.handleBlur}
-                        value={validation.values.mobile || ""}
-                        invalid={
-                          validation.touched.mobile && validation.errors.mobile
-                            ? true
-                            : false
-                        }
+                        value={validation.values.name || ""}
+                        invalid={validation.touched.name && validation.errors.name}
                       />
-                      {validation.touched.mobile && validation.errors.mobile ? (
-                        <FormFeedback type="invalid">
-                          {" "}
-                          {validation.errors.mobile}{" "}
-                        </FormFeedback>
-                      ) : null}
-                    </div>
-                    {/* <div className="mb-3">
-                      <Label>Designation</Label>
+                      {validation.touched.name && validation.errors.name && (
+                        <FormFeedback type="invalid">{validation.errors.name}</FormFeedback>
+                      )}
+                    </FormGroup>
+
+                    <FormGroup>
+                      <Label>Description</Label>
                       <Input
-                        type="select"
-                        name="designation"
-                        className="form-select"
+                        name="description"
+                        type="textarea"
+                        placeholder="Enter Description"
                         onChange={validation.handleChange}
                         onBlur={validation.handleBlur}
-                        value={validation.values.designation || ""}
-                        invalid={
-                          validation.touched.designation &&
-                          validation.errors.designation
-                            ? true
-                            : false
-                        }
+                        value={validation.values.description || ""}
+                        invalid={validation.touched.description && validation.errors.description}
+                      />
+                      {validation.touched.description && validation.errors.description && (
+                        <FormFeedback type="invalid">{validation.errors.description}</FormFeedback>
+                      )}
+                    </FormGroup>
+
+                    <FormGroup>
+                      <Label>Category Level</Label>
+                      <Input
+                        name="catLevel"
+                        type="select"
+                        onChange={validation.handleChange}
+                        onBlur={validation.handleBlur}
+                        value={validation.values.catLevel || ""}
+                        invalid={validation.touched.catLevel && validation.errors.catLevel}
                       >
-                        <option>Frontend Developer</option>
-                        <option>UI/UX Designer</option>
-                        <option>Backend Developer</option>
-                        <option>Full Stack Developer</option>
+                        <option value="">Select Level</option>
+                        <option value="1">Level 1</option>
+                        <option value="2">Level 2</option>
                       </Input>
-                      {validation.touched.designation &&
-                      validation.errors.designation ? (
-                        <FormFeedback type="invalid">
-                          {" "}
-                          {validation.errors.designation}{" "}
-                        </FormFeedback>
-                      ) : null}
-                    </div> */}
-                  </Col>
-                </Row>
-                <Row>
-                  <Col>
-                    <div className="text-end">
-                      <Button
-                        type="submit"
-                        color="success"
-                        className="save-user"
-                      >
-                        {" "}
-                        {!!isEdit ? "Update" : "Add"}{" "}
+                      {validation.touched.catLevel && validation.errors.catLevel && (
+                        <FormFeedback type="invalid">{validation.errors.catLevel}</FormFeedback>
+                      )}
+                    </FormGroup>
+
+                    <FormGroup>
+                      <Label>Parent Category</Label>
+                      <Input
+                        name="parentCategory"
+                        type="text"
+                        placeholder="Parent Category ID (Optional)"
+                        onChange={validation.handleChange}
+                        value={validation.values.parentCategory || ""}
+                      />
+                    </FormGroup>
+
+                    <div className="text-end mt-3">
+                      <Button type="submit" color="primary">
+                        {!!isEdit ? "Update Category" : "Create Category"}
                       </Button>
                     </div>
                   </Col>
